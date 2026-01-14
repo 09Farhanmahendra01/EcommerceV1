@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Model
+enum RoleUser {
+  superadmin
+  seller
+  customer
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  userEmail    String   @unique @map("user_email") @db.VarChar
+  userPassword String   @map("user_password") @db.VarChar
+  userType     RoleUser @map("user_type")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  seller   Seller?
+  customer Customer?
+
+  @@map("users")
+}
+
+model Seller {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @unique @map("user_id") @db.Uuid
+  storeOwnerName    String  @map("store_owner_name") @db.VarChar
+  storeName         String  @unique @map("store_name") @db.VarChar
+  storeDescription  String? @map("store_description") @db.Text
+  storeAddress      String  @map("store_address") @db.Text
+  storePhotoProfile String? @map("store_photo_profile") @db.VarChar
+  storeNoHandphone  Int     @unique @map("store_no_handphone")
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productCategories ProductCategory[]
+  products          Product[]
+  orders            Order[]
+
+  @@map("sellers")
+}
+
+model Customer {
+  id                   String  @id @default(uuid()) @db.Uuid
+  userId               String  @unique @map("user_id") @db.Uuid
+  customerName         String  @map("customer_name") @db.VarChar
+  customerPhotoProfile String? @map("customer_photo_profile") @db.VarChar
+  customerNoHandphone  Int     @unique @map("customer_no_handphone")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientAddresses RecipientAddress[]
+  orders             Order[]
+
+  @@map("customers")
+}
+
+model RecipientAddress {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  value      String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@map("recipient_address")
+}
+
+model ProductCategory {
+  id                  String   @id @default(uuid()) @db.Uuid
+  sellerId            String   @map("seller_id") @db.Uuid
+  productCategoryName String   @map("product_category_name") @db.VarChar
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  seller   Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id                   String   @id @default(uuid()) @db.Uuid
+  sellerId             String   @map("seller_id") @db.Uuid
+  productCategoryId    String   @map("product_category_id") @db.Uuid
+  productName          String   @map("product_name") @db.VarChar
+  productKatalogImages String   @map("product_katalog_images") @db.Text
+  productDescription   String   @map("product_description") @db.Text
+  productVariantStatus Boolean  @default(false) @map("product_variant_status")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  seller          Seller           @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  productCategory ProductCategory  @relation(fields: [productCategoryId], references: [id], onDelete: Cascade)
+  productVariants ProductVariant[]
+  orders          Order[]
+
+  @@map("products")
+}
+
+model ProductVariant {
+  id                   String   @id @default(uuid()) @db.Uuid
+  productId            String   @map("product_id") @db.Uuid
+  productVariantName   String?  @map("product_variant_name") @db.VarChar
+  productVariantPrice  Int      @map("product_variant_price")
+  productVariantStock  Int      @map("product_variant_stock")
+  productVariantStatus Boolean  @default(false) @map("product_variant_status")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model Order {
+  id                       String   @id @default(uuid()) @db.Uuid
+  orderNumber              String   @unique @map("order_number") @db.VarChar
+  customerId               String   @map("customer_id") @db.Uuid
+  sellerId                 String   @map("seller_id") @db.Uuid
+  productId                String   @map("product_id") @db.Uuid
+  recipientAddressId       String   @map("recipient_address_id") @db.Uuid
+  // snapshot customer
+  customerName             String   @map("customer_name") @db.VarChar
+  customerEmail            String   @map("customer_email") @db.VarChar
+  customerNoHandphone      Int      @map("customer_no_handphone")
+  customerRecipientAddress String   @map("customer_recipient_address") @db.Text
+  // snapshot seller
+  storeName                String   @map("store_name") @db.VarChar
+  storeAddress             String   @map("store_address") @db.Text
+  storeNoHandphone         Int      @map("store_no_handphone")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  seller           Seller           @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  recipientAddress RecipientAddress @relation(fields: [recipientAddressId], references: [id], onDelete: Restrict)
+  orderItems       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id                   String  @id @default(uuid()) @db.Uuid
+  orderId              String  @map("order_id") @db.Uuid
+  // snapshot product
+  productName          String  @map("product_name") @db.VarChar
+  productKatalogImages String  @map("product_katalog_images") @db.Text
+  productDescription   String  @map("product_description") @db.Text
+  // snapshot product category
+  productCategoryName  String  @map("product_category_name") @db.VarChar
+  // snapshot product variant
+  productVariantName   String? @map("product_variant_name") @db.VarChar
+  productVariantPrice  Int     @map("product_variant_price")
+  productVariantStock  Int     @map("product_variant_stock")
+  productVariantStatus Boolean @map("product_variant_status")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
